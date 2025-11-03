@@ -1,0 +1,27 @@
+version: '3.9'
+services:
+  gerenciamento:
+    build: ./gerenciamento
+    container_name: gerenciamento_service
+    ports:
+      - "5000:5000"
+
+  reservas:
+    build: ./reservas
+    container_name: reservas_service
+    ports:
+      - "5001:5000"
+    depends_on:
+      - gerenciamento
+    environment:
+      - GERENCIAMENTO_URL=http://gerenciamento:5000
+
+  atividades:
+    build: ./atividades
+    container_name: atividades_service
+    ports:
+      - "5002:5000"
+    depends_on:
+      - gerenciamento
+    environment:
+      - GERENCIAMENTO_URL=http://gerenciamento:5000
