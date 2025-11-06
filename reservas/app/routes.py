@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app.models import db, Reserva
 import requests, os
+from datetime import datetime
 
 reservas_bp = Blueprint('reservas', __name__)
 GERENCIAMENTO_URL = os.getenv('GERENCIAMENTO_URL', 'http://gerenciamento:5000')
@@ -20,45 +21,67 @@ def criar_reserva():
         schema:
           type: object
           required:
-            - id_turma
+            - turma_id
+            - num_sala
             - data
           properties:
-            id_turma:
+            turma_id:
               type: integer
               description: ID da turma existente no serviço de gerenciamento
               example: 1
+            num_sala:
+              type: integer
+              description: Número da sala reservada.
+              example: 101
+            lab:
+              type: boolean
+              description: Indica se a reserva é em um laboratório.
+              example: false
             data:
               type: string
-              description: Data da reserva (pode ser texto livre ou formato ISO)
+              format: date
+              description: Data da reserva no formato YYYY-MM-DD.
               example: "2025-11-05"
     responses:
       201:
         description: Reserva criada com sucesso
-        examples:
-          application/json: {
-            "id": 1,
-            "id_turma": 1,
-            "data": "2025-11-05"
-          }
       404:
         description: Turma não encontrada
-        examples:
-          application/json: {
-            "erro": "Turma não encontrada"
-          }
     """
     data = request.get_json()
-    id_turma = data.get('id_turma')
+    turma_id = data.get('turma_id')
+    num_sala = data.get('num_sala')
+    lab = data.get('lab', False)
+    data_str = data.get('data')
 
-    # valida se a turma existe no Gerenciamento
-    resp = requests.get(f"{GERENCIAMENTO_URL}/turmas/{id_turma}")
+    if not all([turma_id, num_sala, data_str]):
+        return jsonify({'erro': 'Campos obrigatórios ausentes'}), 400
+
+    try:
+        data_reserva = datetime.strptime(data_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}), 400
+
+    resp = requests.get(f"{GERENCIAMENTO_URL}/turmas/{turma_id}")
     if resp.status_code != 200:
         return jsonify({'erro': 'Turma não encontrada'}), 404
 
-    reserva = Reserva(id_turma=id_turma, data=data['data'])
+    reserva = Reserva(
+        turma_id=turma_id,
+        num_sala=num_sala,
+        lab=lab,
+        data=data_reserva
+    )
     db.session.add(reserva)
     db.session.commit()
-    return jsonify({'id': reserva.id, 'id_turma': id_turma, 'data': reserva.data}), 201
+    
+    return jsonify({
+        'id': reserva.id,
+        'turma_id': reserva.turma_id,
+        'num_sala': reserva.num_sala,
+        'lab': reserva.lab,
+        'data': reserva.data.isoformat()
+    }), 201
 
 @reservas_bp.route('/reservas', methods=['GET'])
 def listar_reservas():
@@ -71,14 +94,17 @@ def listar_reservas():
     responses:
       200:
         description: Lista de reservas
-        examples:
-          application/json: [
-            {"id": 1, "id_turma": 1, "data": "2025-11-05"},
-            {"id": 2, "id_turma": 2, "data": "2025-11-06"}
-          ]
     """
     reservas = Reserva.query.all()
-    return jsonify([{'id': r.id, 'id_turma': r.id_turma, 'data': r.data} for r in reservas])
+    return jsonify([
+        {
+            'id': r.id,
+            'turma_id': r.turma_id,
+            'num_sala': r.num_sala,
+            'lab': r.lab,
+            'data': r.data.isoformat()
+        } for r in reservas
+    ])
 
 @reservas_bp.route('/reservas/<int:id>', methods=['GET'])
 def obter_reserva(id):
@@ -102,7 +128,13 @@ def obter_reserva(id):
     reserva = Reserva.query.get(id)
     if not reserva:
         return jsonify({'erro': 'Reserva não encontrada'}), 404
-    return jsonify({'id': reserva.id, 'id_turma': reserva.id_turma, 'data': reserva.data})
+    return jsonify({
+        'id': reserva.id,
+        'turma_id': reserva.turma_id,
+        'num_sala': reserva.num_sala,
+        'lab': reserva.lab,
+        'data': reserva.data.isoformat()
+    })
 
 @reservas_bp.route('/reservas/<int:id>', methods=['PUT'])
 def atualizar_reserva(id):
@@ -123,10 +155,15 @@ def atualizar_reserva(id):
         schema:
           type: object
           properties:
-            id_turma:
+            turma_id:
               type: integer
+            num_sala:
+              type: integer
+            lab:
+              type: boolean
             data:
               type: string
+              format: date
     responses:
       200:
         description: Reserva atualizada
@@ -136,16 +173,32 @@ def atualizar_reserva(id):
     reserva = Reserva.query.get(id)
     if not reserva:
         return jsonify({'erro': 'Reserva não encontrada'}), 404
+        
     data = request.get_json()
-    id_turma = data.get('id_turma')
-    if id_turma:
-        resp = requests.get(f"{GERENCIAMENTO_URL}/turmas/{id_turma}")
+    turma_id = data.get('turma_id')
+    if turma_id:
+        resp = requests.get(f"{GERENCIAMENTO_URL}/turmas/{turma_id}")
         if resp.status_code != 200:
             return jsonify({'erro': 'Turma não encontrada'}), 404
-        reserva.id_turma = id_turma
-    reserva.data = data.get('data', reserva.data)
+        reserva.turma_id = turma_id
+
+    reserva.num_sala = data.get('num_sala', reserva.num_sala)
+    reserva.lab = data.get('lab', reserva.lab)
+    
+    if 'data' in data:
+        try:
+            reserva.data = datetime.strptime(data['data'], '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}), 400
+
     db.session.commit()
-    return jsonify({'id': reserva.id, 'id_turma': reserva.id_turma, 'data': reserva.data})
+    return jsonify({
+        'id': reserva.id,
+        'turma_id': reserva.turma_id,
+        'num_sala': reserva.num_sala,
+        'lab': reserva.lab,
+        'data': reserva.data.isoformat()
+    })
 
 @reservas_bp.route('/reservas/<int:id>', methods=['DELETE'])
 def deletar_reserva(id):

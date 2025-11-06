@@ -262,8 +262,6 @@ def criar_aluno():
             idade: { type: integer, example: 20 }
             turma_id: { type: integer, example: 1 }
             data_nascimento: { type: string, format: date, example: "2004-01-15" }
-            nota_primeiro_semestre: { type: number, format: float, example: 8.5 }
-            nota_segundo_semestre: { type: number, format: float, example: 9.0 }
     responses:
       201: { description: "Aluno criado" }
       404: { description: "Turma não encontrada" }
@@ -271,19 +269,12 @@ def criar_aluno():
     data = request.get_json()
     if not Turma.query.get(data['turma_id']):
         return jsonify({'erro': 'Turma não encontrada'}), 404
-    
-    n1 = data.get('nota_primeiro_semestre')
-    n2 = data.get('nota_segundo_semestre')
-    media = (n1 + n2) / 2 if n1 is not None and n2 is not None else None
 
     aluno = Aluno(
         nome=data['nome'],
         idade=data.get('idade'),
         turma_id=data['turma_id'],
-        data_nascimento=datetime.fromisoformat(data['data_nascimento']).date() if data.get('data_nascimento') else None,
-        nota_primeiro_semestre=n1,
-        nota_segundo_semestre=n2,
-        media_final=media
+        data_nascimento=datetime.fromisoformat(data['data_nascimento']).date() if data.get('data_nascimento') else None
     )
     db.session.add(aluno)
     db.session.commit()
@@ -336,8 +327,6 @@ def atualizar_aluno(id):
             idade: { type: integer }
             turma_id: { type: integer }
             data_nascimento: { type: string, format: date }
-            nota_primeiro_semestre: { type: number, format: float }
-            nota_segundo_semestre: { type: number, format: float }
     responses:
       200: { description: "Aluno atualizado" }
       404: { description: "Aluno ou Turma não encontrado" }
@@ -354,12 +343,6 @@ def atualizar_aluno(id):
     aluno.turma_id = data.get('turma_id', aluno.turma_id)
     if 'data_nascimento' in data:
         aluno.data_nascimento = datetime.fromisoformat(data['data_nascimento']).date() if data.get('data_nascimento') else None
-    
-    n1 = data.get('nota_primeiro_semestre', aluno.nota_primeiro_semestre)
-    n2 = data.get('nota_segundo_semestre', aluno.nota_segundo_semestre)
-    aluno.nota_primeiro_semestre = n1
-    aluno.nota_segundo_semestre = n2
-    aluno.media_final = (n1 + n2) / 2 if n1 is not None and n2 is not None else aluno.media_final
 
     db.session.commit()
     return jsonify(to_dict(aluno))
