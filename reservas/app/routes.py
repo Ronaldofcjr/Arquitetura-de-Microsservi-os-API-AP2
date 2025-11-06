@@ -79,3 +79,96 @@ def listar_reservas():
     """
     reservas = Reserva.query.all()
     return jsonify([{'id': r.id, 'id_turma': r.id_turma, 'data': r.data} for r in reservas])
+
+@reservas_bp.route('/reservas/<int:id>', methods=['GET'])
+def obter_reserva(id):
+    """
+    Obter uma reserva por ID
+    ---
+    tags:
+      - Reservas
+    parameters:
+      - name: id
+        in: path
+        type: integer
+        required: true
+        description: ID da reserva
+    responses:
+      200:
+        description: Dados da reserva
+      404:
+        description: Reserva não encontrada
+    """
+    reserva = Reserva.query.get(id)
+    if not reserva:
+        return jsonify({'erro': 'Reserva não encontrada'}), 404
+    return jsonify({'id': reserva.id, 'id_turma': reserva.id_turma, 'data': reserva.data})
+
+@reservas_bp.route('/reservas/<int:id>', methods=['PUT'])
+def atualizar_reserva(id):
+    """
+    Atualizar uma reserva
+    ---
+    tags:
+      - Reservas
+    parameters:
+      - name: id
+        in: path
+        type: integer
+        required: true
+        description: ID da reserva
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            id_turma:
+              type: integer
+            data:
+              type: string
+    responses:
+      200:
+        description: Reserva atualizada
+      404:
+        description: Reserva ou Turma não encontrada
+    """
+    reserva = Reserva.query.get(id)
+    if not reserva:
+        return jsonify({'erro': 'Reserva não encontrada'}), 404
+    data = request.get_json()
+    id_turma = data.get('id_turma')
+    if id_turma:
+        resp = requests.get(f"{GERENCIAMENTO_URL}/turmas/{id_turma}")
+        if resp.status_code != 200:
+            return jsonify({'erro': 'Turma não encontrada'}), 404
+        reserva.id_turma = id_turma
+    reserva.data = data.get('data', reserva.data)
+    db.session.commit()
+    return jsonify({'id': reserva.id, 'id_turma': reserva.id_turma, 'data': reserva.data})
+
+@reservas_bp.route('/reservas/<int:id>', methods=['DELETE'])
+def deletar_reserva(id):
+    """
+    Deletar uma reserva
+    ---
+    tags:
+      - Reservas
+    parameters:
+      - name: id
+        in: path
+        type: integer
+        required: true
+        description: ID da reserva
+    responses:
+      200:
+        description: Reserva deletada
+      404:
+        description: Reserva não encontrada
+    """
+    reserva = Reserva.query.get(id)
+    if not reserva:
+        return jsonify({'erro': 'Reserva não encontrada'}), 404
+    db.session.delete(reserva)
+    db.session.commit()
+    return jsonify({'mensagem': 'Reserva deletada com sucesso'})

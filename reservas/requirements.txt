@@ -1,4 +1,4 @@
 Flask
-flasgger
 Flask-SQLAlchemy
 requests
+flasgger
