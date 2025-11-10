@@ -72,6 +72,6 @@ docker-compose down
 
 ## Integrantes do Grupo
 
-- (Nome do Integrante 1)
-- (Nome do Integrante 2)
-- (Adicionar mais integrantes conforme necessário)
+- Ronaldo - RA 2403661
+- Maycon - RA 2402929
+- Luis Gabriel - RA 2402947
